@@ -1,5 +1,8 @@
 # 🏙️ UrbanPulse — Local-AI Urban Infrastructure Sentinel & Automated Government Dispatch Engine
 
+[![Live Web App](https://img.shields.io/badge/Live%20Demo-urban--pulse--ai.ai.studio-brightgreen?style=for-the-badge&logo=googlechrome&logoColor=white)](https://urban-pulse-ai.ai.studio/)
+> 🌐 **Live Deployed App:** [https://urban-pulse-ai.ai.studio/](https://urban-pulse-ai.ai.studio/)
+
 [![GitHub Repository](https://img.shields.io/badge/GitHub-siva5842%2Furban--pulse--ai-181717?style=flat&logo=github)](https://github.com/siva5842/urban-pulse-ai)
 [![Python](https://img.shields.io/badge/Backend-FastAPI%20%7C%20Python%203.10+-3776AB?style=flat&logo=python&logoColor=white)](https://fastapi.tiangolo.com/)
 [![AI Model](https://img.shields.io/badge/AI%20Engine-Hugging%20Face%20CLIP-FFD21E?style=flat&logo=huggingface&logoColor=black)](https://huggingface.co/openai/clip-vit-base-patch32)
