@@ -74,7 +74,6 @@ Categorizes defects and routes work orders directly to the responsible division:
 ## 🚀 Quick Start (Run Locally)
 
 ### 1. Clone the Repository
-```bash
 git clone [https://github.com/siva5842/urban-pulse-ai.git](https://github.com/siva5842/urban-pulse-ai.git)
 cd urban-pulse-ai
 2. Start the Backend Service
