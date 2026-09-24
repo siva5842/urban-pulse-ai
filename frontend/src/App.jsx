@@ -1,17 +1,95 @@
 import React, { useState, useEffect, useRef } from 'react';
 import L from 'leaflet';
 import { 
-  Camera, MapPin, AlertTriangle, ShieldCheck, CheckCircle2, 
+  Camera, MapPin, ShieldCheck, 
   XCircle, Volume2, FileText, ChevronDown, ChevronUp, RefreshCw, 
-  Clock, Award, Radio, Truck, Car, Bike, UserCheck, Flame, Droplets, Zap, Trash2, Navigation
+  Truck, Radio, Eye
 } from 'lucide-react';
 
-const API_BASE = "http://localhost:8000/api";
+export const PAGALAHALLI_COORDS = { lat: 12.0932, lng: 78.1841 };
+
+export const CATEGORY_PRESETS = [
+  {
+    id: 'dustbin',
+    emoji: '🚯',
+    label: 'Dustbin / Waste',
+    title: 'Overflowing Garbage / Dustbin Dump',
+    department: 'Municipal Sanitation',
+    category: 'SANITATION_WASTE',
+    severity: 3,
+    depth: 'N/A',
+    isWater: 0,
+    advisory: 'Uncollected domestic and market refuse overflowing on walkway and curb.',
+    color: 'from-emerald-600 to-teal-600',
+    activeBorder: 'border-emerald-400',
+    activeBg: 'bg-emerald-950/70'
+  },
+  {
+    id: 'pothole',
+    emoji: '🕳️',
+    label: 'Pothole / Crater',
+    title: 'Deep Asphalt Road Crater',
+    department: 'Highways & PWD',
+    category: 'ROAD_TRANSIT',
+    severity: 4,
+    depth: '>10 cm (Severe Hazard)',
+    isWater: 0,
+    advisory: 'Deep cavity with sharp jagged asphalt edges. High tire puncture and two-wheeler spill hazard.',
+    color: 'from-rose-600 to-red-600',
+    activeBorder: 'border-rose-400',
+    activeBg: 'bg-rose-950/70'
+  },
+  {
+    id: 'water',
+    emoji: '💧',
+    label: 'Water Leak',
+    title: 'Burst Potable Drinking Pipe',
+    department: 'TWAD Water Board',
+    category: 'WATER_DRAINAGE',
+    severity: 4,
+    depth: 'N/A',
+    isWater: 1,
+    advisory: 'Pressurized clean drinking water pipe fractured under shoulder causing surface pooling.',
+    color: 'from-blue-600 to-cyan-600',
+    activeBorder: 'border-cyan-400',
+    activeBg: 'bg-cyan-950/70'
+  },
+  {
+    id: 'streetlight',
+    emoji: '⚡',
+    label: 'Streetlight',
+    title: 'Dark Streetlight / Loose Wire',
+    department: 'TANGEDCO Electricity Board',
+    category: 'ELECTRICAL_LIGHTING',
+    severity: 3,
+    depth: 'N/A',
+    isWater: 0,
+    advisory: 'Luminaire fixture failure and dangling cable creating nighttime blackout hazard.',
+    color: 'from-amber-600 to-yellow-600',
+    activeBorder: 'border-amber-400',
+    activeBg: 'bg-amber-950/70'
+  },
+  {
+    id: 'footpath',
+    emoji: '♿',
+    label: 'Footpath',
+    title: 'Broken Sidewalk / Footpath Obstruction',
+    department: 'Town Planning & Footpaths',
+    category: 'PEDESTRIAN_ACCESS',
+    severity: 3,
+    depth: 'N/A',
+    isWater: 0,
+    advisory: 'Displaced paving blocks and broken storm grating obstructing pedestrian passage.',
+    color: 'from-purple-600 to-violet-600',
+    activeBorder: 'border-purple-400',
+    activeBg: 'bg-purple-950/70'
+  }
+];
 
 const SEED_ISSUES = [
   {
     id: "iss-tn-001",
-    title: "Muddy Road Crater near Bus Stop",
+    title: "Deep Asphalt Road Crater near Bus Stop",
     category: "ROAD_TRANSIT",
     department: "Highways & PWD",
     severity: 4,
@@ -21,14 +99,14 @@ const SEED_ISSUES = [
     device_lng: 78.1853,
     is_on_site: 1,
     photo_url: "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80",
-    depth_cm: ">10 cm (Severe Blind Hazard)",
-    is_water_filled: 1,
-    depth_advisory: "Opaque turbid water concealing cavity floor. High risk of vehicle stalling, tire rupture, and two-wheeler overturning.",
-    impact_ambulance: "Priority Emergency Clearance Required",
-    impact_ev: "High Battery Immersion Risk (>6 inches water)",
-    impact_two_wheeler: "CRITICAL: Severe Skidding and Overturn Hazard",
-    impact_four_wheeler: "Risk of Underbody Scraping and Rim Denting",
-    impact_pedestrian: "Unsafe for Walking / Slip Risk",
+    depth_cm: ">10 cm (Severe Hazard)",
+    is_water_filled: 0,
+    depth_advisory: "Deep cavity with sharp jagged asphalt rim. High puncture and fall hazard.",
+    impact_ambulance: "Minor Delay (+2 min)",
+    impact_ev: "Safe",
+    impact_two_wheeler: "High Skidding & Fall Risk",
+    impact_four_wheeler: "Caution (Reduce speed <20 km/h)",
+    impact_pedestrian: "Slip & Fall Risk",
     true_votes: 4,
     false_votes: 0,
     trust_score: 100,
@@ -40,7 +118,7 @@ const SEED_ISSUES = [
   },
   {
     id: "iss-tn-002",
-    title: "Burst Clean Drinking Water Mainline",
+    title: "Burst Potable Drinking Pipe",
     category: "WATER_DRAINAGE",
     department: "TWAD Water Board",
     severity: 4,
@@ -51,13 +129,13 @@ const SEED_ISSUES = [
     is_on_site: 1,
     photo_url: "https://images.unsplash.com/photo-1584438784894-089d6a62b8fa?auto=format&fit=crop&w=600&q=80",
     depth_cm: "N/A",
-    is_water_filled: 0,
-    depth_advisory: "Pressurized potable water pipe ruptured under pedestrian verge.",
-    impact_ambulance: "Passable with Minor Slowdown",
-    impact_ev: "Normal Safe Passability",
-    impact_two_wheeler: "CRITICAL: Severe Skidding and Overturn Hazard",
-    impact_four_wheeler: "Passable",
-    impact_pedestrian: "Unsafe for Walking / Slip Risk",
+    is_water_filled: 1,
+    depth_advisory: "Subsurface high-pressure drinking pipeline breach causing street flooding.",
+    impact_ambulance: "Passable",
+    impact_ev: "Battery Immersion Risk (>6 in water)",
+    impact_two_wheeler: "High Skidding & Fall Risk",
+    impact_four_wheeler: "Caution (Reduce speed <20 km/h)",
+    impact_pedestrian: "Slip & Fall Risk",
     true_votes: 6,
     false_votes: 0,
     trust_score: 100,
@@ -82,7 +160,7 @@ const SEED_ISSUES = [
   },
   {
     id: "iss-tn-003",
-    title: "Broken Dark Streetlight Cluster",
+    title: "Dark Streetlight / Loose Wire",
     category: "ELECTRICAL_LIGHTING",
     department: "TANGEDCO Electricity Board",
     severity: 3,
@@ -94,12 +172,12 @@ const SEED_ISSUES = [
     photo_url: "https://images.unsplash.com/photo-1509114397022-ed747cca3f65?auto=format&fit=crop&w=600&q=80",
     depth_cm: "N/A",
     is_water_filled: 0,
-    depth_advisory: "Luminaire failure and dangling secondary cable wire.",
-    impact_ambulance: "Passable with Minor Slowdown",
-    impact_ev: "Normal Safe Passability",
-    impact_two_wheeler: "Passable with Caution",
+    depth_advisory: "Luminaire fixture failure and dangling cable creating nighttime blackout hazard.",
+    impact_ambulance: "Passable",
+    impact_ev: "Safe",
+    impact_two_wheeler: "Caution",
     impact_four_wheeler: "Passable",
-    impact_pedestrian: "Unsafe for Walking / Slip Risk",
+    impact_pedestrian: "Slip & Fall Risk",
     true_votes: 2,
     false_votes: 0,
     trust_score: 100,
@@ -111,7 +189,7 @@ const SEED_ISSUES = [
   },
   {
     id: "iss-tn-004",
-    title: "Overflowing Waste Dump on Market Road",
+    title: "Overflowing Garbage / Dustbin Dump",
     category: "SANITATION_WASTE",
     department: "Municipal Sanitation",
     severity: 3,
@@ -123,12 +201,12 @@ const SEED_ISSUES = [
     photo_url: "https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80",
     depth_cm: "N/A",
     is_water_filled: 0,
-    depth_advisory: "Uncollected organic waste blocking roadside gutter channel.",
-    impact_ambulance: "Passable with Minor Slowdown",
-    impact_ev: "Normal Safe Passability",
-    impact_two_wheeler: "Passable with Caution",
+    depth_advisory: "Uncollected domestic and market refuse overflowing on walkway and curb.",
+    impact_ambulance: "Passable",
+    impact_ev: "Safe",
+    impact_two_wheeler: "Caution",
     impact_four_wheeler: "Passable",
-    impact_pedestrian: "Unsafe for Walking / Slip Risk",
+    impact_pedestrian: "Slip & Fall Risk",
     true_votes: 3,
     false_votes: 1,
     trust_score: 75,
@@ -162,7 +240,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
   return R * c;
 }
 
-const MAP_LAYERS = {
+export const MAP_LAYERS = {
   satellite: {
     id: 'satellite',
     label: '🛰️ Satellite View',
@@ -179,26 +257,141 @@ const MAP_LAYERS = {
   }
 };
 
+/**
+ * Client-Side Image Downscaler (HTML5 Canvas):
+ * Resizes uploaded photo to max 600px width at 0.7 JPEG quality (<100 KB).
+ */
+export function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const maxWidth = 600;
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(dataUrl);
+        } else {
+          resolve(e.target?.result || '');
+        }
+      };
+      img.onerror = () => resolve(e.target?.result || '');
+      img.src = e.target?.result;
+    };
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * Vehicle Passability Helper
+ */
+export function getPassabilityMatrix(issue) {
+  const isPothole = issue.category === 'ROAD_TRANSIT' || (issue.title && issue.title.toLowerCase().includes('crater')) || (issue.title && issue.title.toLowerCase().includes('pothole'));
+  const isWater = issue.is_water_filled === 1 || issue.category === 'WATER_DRAINAGE';
+  const isGarbage = issue.category === 'SANITATION_WASTE';
+  const isFootpath = issue.category === 'PEDESTRIAN_ACCESS';
+
+  // 1. Ambulance: 🟢 Passable / 🟡 Minor Delay (+2 min) / 🔴 Blocked
+  let ambStatus = "🟢 Passable";
+  let ambStyle = "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
+  if (issue.severity >= 5 || (isPothole && issue.severity >= 4 && isWater)) {
+    ambStatus = "🔴 Blocked";
+    ambStyle = "text-rose-400 bg-rose-950/50 border-rose-800/50";
+  } else if (issue.severity >= 3 || isPothole) {
+    ambStatus = "🟡 Minor Delay (+2 min)";
+    ambStyle = "text-amber-400 bg-amber-950/40 border-amber-800/40";
+  }
+
+  // 2. Two-Wheeler: 🔴 High Skidding & Fall Risk / 🟡 Caution / 🟢 Safe
+  let bikeStatus = "🟢 Safe";
+  let bikeStyle = "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
+  if (isPothole || isWater || issue.severity >= 4) {
+    bikeStatus = "🔴 High Skidding & Fall Risk";
+    bikeStyle = "text-rose-400 bg-rose-950/50 border-rose-800/50";
+  } else if (issue.severity >= 2 || isGarbage) {
+    bikeStatus = "🟡 Caution";
+    bikeStyle = "text-amber-400 bg-amber-950/40 border-amber-800/40";
+  }
+
+  // 3. EV: 🔴 Battery Immersion Risk (>6 in water) / 🟢 Safe
+  let evStatus = "🟢 Safe";
+  let evStyle = "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
+  if (isWater) {
+    evStatus = "🔴 Battery Immersion Risk (>6 in water)";
+    evStyle = "text-rose-400 bg-rose-950/50 border-rose-800/50";
+  }
+
+  // 4. Four-Wheeler: 🟡 Caution (Reduce speed <20 km/h) / 🟢 Passable
+  let carStatus = "🟢 Passable";
+  let carStyle = "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
+  if (issue.severity >= 4 || isPothole) {
+    carStatus = "🟡 Caution (Reduce speed <20 km/h)";
+    carStyle = "text-amber-400 bg-amber-950/40 border-amber-800/40";
+  }
+
+  // 5. Pedestrian: 🔴 Slip & Fall Risk / 🟢 Safe Walkway
+  let pedStatus = "🟢 Safe Walkway";
+  let pedStyle = "text-emerald-400 bg-emerald-950/40 border-emerald-800/40";
+  if (issue.severity >= 3 || isFootpath || isGarbage || isWater || isPothole) {
+    pedStatus = "🔴 Slip & Fall Risk";
+    pedStyle = "text-rose-400 bg-rose-950/50 border-rose-800/50";
+  }
+
+  return [
+    { label: "Ambulance", icon: "🚑", status: ambStatus, style: ambStyle },
+    { label: "Two-Wheeler", icon: "🛵", status: bikeStatus, style: bikeStyle },
+    { label: "Electric Vehicle (EV)", icon: "⚡", status: evStatus, style: evStyle },
+    { label: "Four-Wheeler", icon: "🚗", status: carStatus, style: carStyle },
+    { label: "Pedestrian", icon: "🚶", status: pedStatus, style: pedStyle }
+  ];
+}
+
 export default function App() {
-  const [issues, setIssues] = useState(SEED_ISSUES);
+  const [issues, setIssues] = useState(() => {
+    try {
+      const saved = localStorage.getItem("urbanpulse_issues");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return SEED_ISSUES;
+  });
+
   const [selectedIssue, setSelectedIssue] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [currentGPS, setCurrentGPS] = useState({ lat: 12.0932, lng: 78.1841 });
   const [activeLayer, setActiveLayer] = useState('satellite');
   const [showModal, setShowModal] = useState(false);
   const [streetViewIssue, setStreetViewIssue] = useState(null);
   const [activeReceipt, setActiveReceipt] = useState(null);
   const [toast, setToast] = useState(null);
   const [previewImage, setPreviewImage] = useState(null);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [isOnSiteVerified, setIsOnSiteVerified] = useState(true);
+  const [, setSelectedFile] = useState(null);
   const [showPayloadDetails, setShowPayloadDetails] = useState(false);
+
+  // Pin & Category State
+  const [pinLocation, setPinLocation] = useState(PAGALAHALLI_COORDS);
+  const [selectedCategory, setSelectedCategory] = useState('pothole');
 
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const tileLayerRef = useRef(null);
   const markersRef = useRef({});
+  const targetPinMarkerRef = useRef(null);
   const fileInputRef = useRef(null);
 
   const switchMapLayer = (layerKey) => {
@@ -219,15 +412,14 @@ export default function App() {
     newLayer.bringToBack();
     tileLayerRef.current = newLayer;
     setActiveLayer(layerKey);
-    showToastMsg(`🗺️ Layer switched to ${config.label} (${config.name})`, "info");
+    showToastMsg(`🗺️ Layer switched to ${config.label}`, "info");
   };
 
   const showToastMsg = (msg, type = "info") => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 4000);
+    setTimeout(() => setToast(null), 4500);
   };
 
-  // Speak aloud with SpeechSynthesis
   const speakAloud = (text) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
@@ -235,76 +427,56 @@ export default function App() {
       utterance.rate = 1.0;
       utterance.pitch = 1.0;
       window.speechSynthesis.speak(utterance);
-      showToastMsg("🔊 Audio broadcast playing...", "info");
+      showToastMsg("🔊 Voice broadcast playing...", "info");
     } else {
       showToastMsg("Speech synthesis not supported in this browser.", "warning");
     }
   };
 
-  // 1. Fetch Issues from API (with seamless local fallback)
-  const fetchIssues = async () => {
+  // Persistent storage sync
+  useEffect(() => {
     try {
-      const res = await fetch(`${API_BASE}/issues`);
-      if (res.ok) {
-        const data = await res.json();
-        setIssues(data);
-        return;
-      }
+      localStorage.setItem("urbanpulse_issues", JSON.stringify(issues));
     } catch {
-      // Offline fallback: load from localStorage or keep current state
-      const saved = localStorage.getItem("urbanpulse_issues");
-      if (saved) {
-        try {
-          setIssues(JSON.parse(saved));
-        } catch {
-          // ignore parse error
-        }
-      }
+      // ignore
     }
-  };
-
-  // 2. Poll every 3 seconds
-  useEffect(() => {
-    fetchIssues();
-    const interval = setInterval(fetchIssues, 3000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Save to localStorage when state updates for seamless offline caching
-  useEffect(() => {
-    localStorage.setItem("urbanpulse_issues", JSON.stringify(issues));
   }, [issues]);
 
-  // 3. Geolocation initialization
+  // GPS Location Locking to Pagalahalli, Dharmapuri (12.0932, 78.1841)
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setCurrentGPS({
-            lat: pos.coords.latitude,
-            lng: pos.coords.longitude
-          });
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const dist = calculateDistance(lat, lng, PAGALAHALLI_COORDS.lat, PAGALAHALLI_COORDS.lng);
+          if (dist <= 15000) {
+            setPinLocation({ lat, lng });
+          } else {
+            console.info(`GPS location (${lat.toFixed(4)}, ${lng.toFixed(4)}) is ${Math.round(dist/1000)}km away (>15km). Locking coordinates to Pagalahalli, Dharmapuri.`);
+            setPinLocation(PAGALAHALLI_COORDS);
+          }
         },
         (err) => {
-          console.warn("Using default Dharmapuri GPS coordinate:", err.message);
+          console.warn("Using default Pagalahalli, Dharmapuri coordinates:", err.message);
+          setPinLocation(PAGALAHALLI_COORDS);
         },
-        { enableHighAccuracy: true, timeout: 5000 }
+        { enableHighAccuracy: true, timeout: 4000 }
       );
     }
   }, []);
 
-  // 4. Initialize Leaflet Map once
+  // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapRef.current) {
       const map = L.map(mapContainerRef.current, {
-        center: [12.0932, 78.1841],
+        center: [PAGALAHALLI_COORDS.lat, PAGALAHALLI_COORDS.lng],
         zoom: 16,
         zoomControl: true
       });
 
-      // Default Active View: Satellite Hybrid (Real Buildings & Aerial Details)
       const defaultLayer = L.tileLayer(MAP_LAYERS['satellite'].url, {
         maxZoom: 20,
         subdomains: MAP_LAYERS['satellite'].subdomains || 'abc',
@@ -313,31 +485,48 @@ export default function App() {
       defaultLayer.bringToBack();
       tileLayerRef.current = defaultLayer;
 
-      // User location pulse circle
-      const userMarker = L.circleMarker([12.0932, 78.1841], {
-        radius: 8,
-        fillColor: '#38bdf8',
-        color: '#ffffff',
-        weight: 2,
-        opacity: 1,
-        fillOpacity: 0.9
-      }).addTo(map);
-      userMarker.bindTooltip("📍 You (Dharmapuri Sentinel)", { permanent: false });
+      // Tap on Map to Place Pin
+      map.on('click', (e) => {
+        const { lat, lng } = e.latlng;
+        setPinLocation({ lat, lng });
+        showToastMsg(`📍 Pin moved to: ${lat.toFixed(5)}°N, ${lng.toFixed(5)}°E`, "info");
+      });
 
       mapRef.current = map;
     }
-
-    return () => {
-      // Keep map across re-renders to prevent container destruction
-    };
   }, []);
 
-  // 5. Update Map Markers when issues change
+  // Target Defect Pin
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    // Clear old markers
+    if (targetPinMarkerRef.current) {
+      map.removeLayer(targetPinMarkerRef.current);
+    }
+
+    const targetMarker = L.circleMarker([pinLocation.lat, pinLocation.lng], {
+      radius: 12,
+      fillColor: '#f59e0b',
+      color: '#ffffff',
+      weight: 3,
+      opacity: 1,
+      fillOpacity: 0.95
+    }).addTo(map);
+
+    targetMarker.bindTooltip(`📍 Defect Target Pin (${pinLocation.lat.toFixed(4)}, ${pinLocation.lng.toFixed(4)})<br/><i>Tap anywhere on map to reposition</i>`, {
+      permanent: false,
+      direction: 'top'
+    });
+
+    targetPinMarkerRef.current = targetMarker;
+  }, [pinLocation]);
+
+  // Update Incident Markers
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
     Object.values(markersRef.current).forEach(m => map.removeLayer(m));
     markersRef.current = {};
 
@@ -351,16 +540,23 @@ export default function App() {
         color: isEscalated ? '#fbbf24' : '#ffffff',
         weight: isEscalated ? 3 : 2,
         opacity: 1,
-        fillOpacity: 0.85
+        fillOpacity: 0.88
       }).addTo(map);
 
-      // Popup Content Template
+      const passability = getPassabilityMatrix(issue);
+      const passabilityHtml = passability.slice(0, 3).map(p => `
+        <div style="display: flex; justify-content: space-between; font-size: 10px; margin-bottom: 2px;">
+          <span>${p.icon} ${p.label}:</span>
+          <strong>${p.status}</strong>
+        </div>
+      `).join('');
+
       const popupHtml = `
-        <div style="min-width: 250px; font-family: ui-sans-serif, system-ui, sans-serif; color: #0f172a;">
+        <div style="min-width: 255px; font-family: ui-sans-serif, system-ui, sans-serif; color: #0f172a; padding: 2px;">
           <img src="${issue.photo_url}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 6px; margin-bottom: 8px;" alt="${issue.title}" />
           
           <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-            <span style="font-weight: 700; font-size: 14px;">${issue.title}</span>
+            <span style="font-weight: 700; font-size: 13px;">${issue.title}</span>
           </div>
 
           <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
@@ -372,20 +568,15 @@ export default function App() {
             </span>
           </div>
 
-          ${issue.is_water_filled ? `
-            <div style="background-color: #fef3c7; border: 1px solid #f59e0b; color: #92400e; font-size: 11px; padding: 6px; border-radius: 4px; margin-bottom: 6px;">
-              ⚠️ <strong>Muddy Water Blind Hazard:</strong> Depth: ${issue.depth_cm}
-            </div>
-          ` : issue.depth_cm !== 'N/A' ? `
-            <div style="background-color: #f1f5f9; color: #334155; font-size: 11px; padding: 6px; border-radius: 4px; margin-bottom: 6px;">
-              📏 Cavity Depth: <strong>${issue.depth_cm}</strong>
-            </div>
-          ` : ''}
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 6px; margin-bottom: 8px;">
+            <div style="font-size: 9px; font-weight: 800; text-transform: uppercase; color: #64748b; margin-bottom: 4px;">Passability Snapshot</div>
+            ${passabilityHtml}
+          </div>
 
           <div style="margin-bottom: 8px;">
             <div style="display: flex; justify-content: space-between; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 2px;">
               <span>Citizen Verification</span>
-              <span>${issue.true_votes} / 5 Votes to Auto-Notify Authority</span>
+              <span>${issue.true_votes} / 5 Votes to Auto-Dispatch</span>
             </div>
             <div style="width: 100%; background-color: #e2e8f0; height: 6px; border-radius: 999px; overflow: hidden;">
               <div style="width: ${Math.min((issue.true_votes / 5) * 100, 100)}%; background-color: ${isEscalated ? '#10b981' : '#3b82f6'}; height: 100%;"></div>
@@ -399,24 +590,24 @@ export default function App() {
           ` : ''}
 
           <div style="display: flex; gap: 4px; margin-bottom: 6px;">
-            <button onclick="window.urbanPulseVote('${issue.id}', 'TRUE')" style="flex: 1; background-color: #10b981; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 11px; font-weight: 600; cursor: pointer;">
+            <button onclick="window.urbanPulseVote && window.urbanPulseVote('${issue.id}', 'TRUE')" style="flex: 1; background-color: #10b981; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: 700; cursor: pointer;">
               👍 Yes, True (${issue.true_votes})
             </button>
-            <button onclick="window.urbanPulseVote('${issue.id}', 'FALSE')" style="flex: 1; background-color: #ef4444; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 11px; font-weight: 600; cursor: pointer;">
+            <button onclick="window.urbanPulseVote && window.urbanPulseVote('${issue.id}', 'FALSE')" style="flex: 1; background-color: #ef4444; color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: 700; cursor: pointer;">
               👎 Fake (${issue.false_votes})
             </button>
           </div>
 
           <div style="display: flex; gap: 4px;">
-            <button onclick="window.urbanPulseSpeak('${issue.id}')" style="flex: 1; background-color: #3b82f6; color: white; border: none; border-radius: 4px; padding: 4px; font-size: 11px; font-weight: 600; cursor: pointer;">
+            <button onclick="window.urbanPulseSpeak && window.urbanPulseSpeak('${issue.id}')" style="flex: 1; background-color: #3b82f6; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 11px; font-weight: 600; cursor: pointer;">
               🔊 Read Aloud
             </button>
-            <button onclick="window.urbanPulseInspect('${issue.id}')" style="flex: 1; background-color: #0f172a; color: white; border: none; border-radius: 4px; padding: 4px; font-size: 11px; font-weight: 600; cursor: pointer;">
-              📋 View Work Order
+            <button onclick="window.urbanPulseInspect && window.urbanPulseInspect('${issue.id}')" style="flex: 1; background-color: #0f172a; color: white; border: none; border-radius: 4px; padding: 5px; font-size: 11px; font-weight: 600; cursor: pointer;">
+              📋 Work Order
             </button>
           </div>
 
-          <button onclick="window.urbanPulseStreetView('${issue.id}')" style="width: 100%; margin-top: 5px; background: linear-gradient(135deg, #0284c7, #2563eb); color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
+          <button onclick="window.urbanPulseStreetView && window.urbanPulseStreetView('${issue.id}')" style="width: 100%; margin-top: 5px; background: linear-gradient(135deg, #0284c7, #2563eb); color: white; border: none; border-radius: 4px; padding: 6px; font-size: 11px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">
             👁️ 360° Street View
           </button>
         </div>
@@ -427,19 +618,17 @@ export default function App() {
     });
   }, [issues]);
 
-  // Window actions for Leaflet popup callbacks
   useEffect(() => {
     window.urbanPulseVote = (id, type) => handleVote(id, type);
     window.urbanPulseSpeak = (id) => {
       const issue = issues.find(i => i.id === id);
       if (issue) {
-        speakAloud(`Urban Pulse Alert. Department: ${issue.department}. Issue: ${issue.title}. Severity grade ${issue.severity} of 5. ${issue.depth_advisory || ''} Vehicle advisory: ${issue.impact_two_wheeler}.`);
+        speakAloud(`Urban Pulse Alert. Department: ${issue.department}. Issue: ${issue.title}. Severity grade ${issue.severity} of 5. ${issue.depth_advisory || ''} Passability: ${issue.impact_two_wheeler}.`);
       }
     };
     window.urbanPulseInspect = (id) => {
       const issue = issues.find(i => i.id === id);
       if (issue) {
-        setSelectedIssue(issue);
         openWorkOrderModal(issue);
       }
     };
@@ -451,37 +640,15 @@ export default function App() {
     };
   }, [issues]);
 
-  // 6. Handle Voting
-  const handleVote = async (issueId, voteType) => {
-    try {
-      const res = await fetch(`${API_BASE}/issues/${issueId}/vote`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          vote_type: voteType,
-          voter_lat: currentGPS.lat,
-          voter_lng: currentGPS.lng
-        })
-      });
-
-      if (res.ok) {
-        const updated = await res.json();
-        setIssues(prev => prev.map(item => item.id === issueId ? updated : item));
-        showToastMsg(`Vote registered! Citizens confidence: ${updated.trust_score}%`, "success");
-        if (updated.is_escalated === 1 && updated.ticket_id) {
-          showToastMsg(`🚨 5/5 Threshold Met! Work Order ${updated.ticket_id} Dispatched to ${updated.department}!`, "alert");
-        }
-        return;
-      }
-    } catch {
-      // Local fallback execution
-      setIssues(prev => prev.map(item => {
+  const handleVote = (issueId, voteType) => {
+    setIssues(prev => {
+      const next = prev.map(item => {
         if (item.id === issueId) {
           const newTrue = voteType === 'TRUE' ? item.true_votes + 1 : item.true_votes;
           const newFalse = voteType === 'FALSE' ? item.false_votes + 1 : item.false_votes;
           const total = newTrue + newFalse;
           const trust = total > 0 ? Math.round((newTrue / total) * 100) : 100;
-          
+
           let escalated = item.is_escalated;
           let ticketId = item.ticket_id;
           let receiptJson = item.ticket_receipt_json;
@@ -498,11 +665,11 @@ export default function App() {
               sla_deadline: item.severity >= 4 ? "24 Hours (Emergency Response)" : "48 Hours (Standard SLA)",
               assigned_ward_officer: "Assistant Executive Engineer - Zone 4",
               payload_dump: {
-                grievance_id: `offline-${Date.now()}`,
+                grievance_id: `grievance-${Date.now()}`,
                 jurisdiction: "Tamil Nadu Municipal Administration & Water Supply",
                 assigned_department: item.department,
                 severity_grade: `Grade ${item.severity}/5`,
-                technical_material_estimate: item.category === 'ROAD_TRANSIT' ? "2.0 Tons Premix Cold Asphalt + Vibratory Roller" : "Standard Municipal Replacement Kit",
+                technical_material_estimate: item.category === 'ROAD_TRANSIT' ? "2.0 Tons Premix Cold Asphalt + Vibratory Compactor" : "Standard Municipal Hardware Kit",
                 dispatch_timestamp: new Date().toISOString()
               }
             });
@@ -523,62 +690,57 @@ export default function App() {
           };
         }
         return item;
-      }));
-      showToastMsg(`Vote registered offline!`, "success");
-    }
-  };
-
-  // 7. Force Escalate
-  const handleForceEscalate = async (issue) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/issues/${issue.id}/escalate-now`, { method: "POST" });
-      if (res.ok) {
-        const data = await res.json();
-        setIssues(prev => prev.map(i => i.id === issue.id ? data.issue : i));
-        setActiveReceipt(data.receipt);
-        setShowModal(true);
-        showToastMsg(`✅ Work Order ${data.receipt.ticket_id} Dispatched!`, "success");
+      });
+      try {
+        localStorage.setItem("urbanpulse_issues", JSON.stringify(next));
+      } catch {
+        // ignore
       }
-    } catch {
-      // Local fallback dispatch
-      const deptCode = issue.department.slice(0, 3).toUpperCase();
-      const ticketId = `TN-${deptCode}-2026-${Math.floor(1000 + Math.random() * 9000)}`;
-      const receipt = {
-        ticket_id: ticketId,
-        portal_status: "ACKNOWLEDGED_201_CREATED",
-        sla_deadline: issue.severity >= 4 ? "24 Hours (Emergency Response)" : "48 Hours (Standard SLA)",
-        assigned_ward_officer: "Assistant Executive Engineer - Zone 4",
-        payload_dump: {
-          grievance_id: `offline-forced-${Date.now()}`,
-          jurisdiction: "Tamil Nadu Municipal Administration & Water Supply",
-          assigned_department: issue.department,
-          coordinates: { lat: issue.lat, lng: issue.lng },
-          verified_citizens_count: issue.true_votes,
-          evidence_photo_url: issue.photo_url,
-          severity_grade: `Grade ${issue.severity}/5`,
-          technical_material_estimate: issue.category === 'ROAD_TRANSIT' ? "2.0 Tons Premix Cold Asphalt + Vibratory Roller" : "Standard Municipal Replacement Kit",
-          dispatch_timestamp: new Date().toISOString()
-        }
-      };
-
-      setIssues(prev => prev.map(i => i.id === issue.id ? {
-        ...i,
-        is_escalated: 1,
-        status: "OFFICIALLY_ESCALATED",
-        ticket_id: ticketId,
-        ticket_receipt_json: JSON.stringify(receipt)
-      } : i));
-
-      setActiveReceipt(receipt);
-      setShowModal(true);
-      showToastMsg(`✅ Work Order ${ticketId} generated and acknowledged!`, "success");
-    } finally {
-      setLoading(false);
-    }
+      return next;
+    });
+    showToastMsg("Vote registered! Live ledger updated.", "success");
   };
 
-  // 8. Open Work Order Modal
+  const handleForceEscalate = (issue) => {
+    const deptCode = issue.department.slice(0, 3).toUpperCase();
+    const ticketId = `TN-${deptCode}-2026-${Math.floor(1000 + Math.random() * 9000)}`;
+    const receipt = {
+      ticket_id: ticketId,
+      portal_status: "ACKNOWLEDGED_201_CREATED",
+      sla_deadline: issue.severity >= 4 ? "24 Hours (Emergency Response)" : "48 Hours (Standard SLA)",
+      assigned_ward_officer: "Assistant Executive Engineer - Zone 4",
+      payload_dump: {
+        grievance_id: `forced-${Date.now()}`,
+        jurisdiction: "Tamil Nadu Municipal Administration & Water Supply",
+        assigned_department: issue.department,
+        coordinates: { lat: issue.lat, lng: issue.lng },
+        verified_citizens_count: issue.true_votes,
+        evidence_photo_url: issue.photo_url,
+        severity_grade: `Grade ${issue.severity}/5`,
+        technical_material_estimate: issue.category === 'ROAD_TRANSIT' ? "2.0 Tons Premix Cold Asphalt + Vibratory Roller" : "Standard Municipal Replacement Kit",
+        dispatch_timestamp: new Date().toISOString()
+      }
+    };
+
+    const updated = issues.map(i => i.id === issue.id ? {
+      ...i,
+      is_escalated: 1,
+      status: "OFFICIALLY_ESCALATED",
+      ticket_id: ticketId,
+      ticket_receipt_json: JSON.stringify(receipt)
+    } : i);
+
+    setIssues(updated);
+    try {
+      localStorage.setItem("urbanpulse_issues", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+    setActiveReceipt(receipt);
+    setShowModal(true);
+    showToastMsg(`✅ Work Order ${ticketId} generated and acknowledged!`, "success");
+  };
+
   const openWorkOrderModal = (issue) => {
     setSelectedIssue(issue);
     if (issue.ticket_receipt_json) {
@@ -599,224 +761,145 @@ export default function App() {
     setShowModal(true);
   };
 
-  // 9. Camera Capture / Image Selection
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
     setSelectedFile(file);
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      setPreviewImage(reader.result);
-    };
-    reader.readAsDataURL(file);
-
-    // Update GPS coordinates at capture moment
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          setCurrentGPS({ lat, lng });
-
-          // Compare with target Dharmapuri center
-          const dist = calculateDistance(lat, lng, 12.0932, 78.1841);
-          setIsOnSiteVerified(dist <= 50000); // verified within Dharmapuri / regional radius
-        },
-        () => {
-          setIsOnSiteVerified(true);
-        }
-      );
+    try {
+      const downscaled = await compressImage(file);
+      setPreviewImage(downscaled);
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => setPreviewImage(reader.result);
+      reader.readAsDataURL(file);
     }
   };
 
-  // 10. Submit Defect to AI Engine
-  const handleSubmitDefect = async () => {
-    if (!selectedFile && !previewImage) {
+  const handleBroadcastDefect = () => {
+    if (!previewImage) {
       showToastMsg("Please capture or select a defect photo first.", "warning");
       return;
     }
 
     setUploading(true);
 
-    const defectLat = currentGPS.lat || 12.0932;
-    const defectLng = currentGPS.lng || 78.1841;
+    const preset = CATEGORY_PRESETS.find(p => p.id === selectedCategory) || CATEGORY_PRESETS[1];
+    const targetLat = pinLocation.lat;
+    const targetLng = pinLocation.lng;
+
+    const newIssue = {
+      id: `iss-tn-${Date.now().toString().slice(-4)}`,
+      title: preset.title,
+      category: preset.category,
+      department: preset.department,
+      severity: preset.severity,
+      lat: targetLat,
+      lng: targetLng,
+      device_lat: targetLat,
+      device_lng: targetLng,
+      is_on_site: 1,
+      photo_url: previewImage,
+      depth_cm: preset.depth,
+      is_water_filled: preset.isWater,
+      depth_advisory: preset.advisory,
+      impact_ambulance: preset.id === 'pothole' ? "Minor Delay (+2 min)" : (preset.severity >= 5 ? "Blocked" : "Passable"),
+      impact_ev: preset.id === 'water' ? "Battery Immersion Risk (>6 in water)" : "Safe",
+      impact_two_wheeler: (preset.id === 'pothole' || preset.id === 'water') ? "High Skidding & Fall Risk" : "Caution",
+      impact_four_wheeler: (preset.id === 'pothole' || preset.id === 'water') ? "Caution (Reduce speed <20 km/h)" : "Passable",
+      impact_pedestrian: "Slip & Fall Risk",
+      true_votes: 1,
+      false_votes: 0,
+      trust_score: 100,
+      status: "ACTIVE",
+      is_escalated: 0,
+      ticket_id: "",
+      ticket_receipt_json: "",
+      timestamp: new Date().toISOString()
+    };
+
+    const nextIssues = [newIssue, ...issues];
+    setIssues(nextIssues);
 
     try {
-      const formData = new FormData();
-      if (selectedFile) {
-        formData.append("image", selectedFile);
-      } else {
-        // Blob from dataURL
-        const blob = await (await fetch(previewImage)).blob();
-        formData.append("image", blob, "camera_capture.jpg");
-      }
-      formData.append("lat", defectLat.toString());
-      formData.append("lng", defectLng.toString());
-      formData.append("device_lat", (defectLat + 0.0001).toString());
-      formData.append("device_lng", (defectLng + 0.0001).toString());
-
-      const res = await fetch(`${API_BASE}/report-issue`, {
-        method: "POST",
-        body: formData
-      });
-
-      if (res.ok) {
-        const newIssue = await res.json();
-        setIssues(prev => [newIssue, ...prev]);
-        showToastMsg(`Defect classified by CLIP: ${newIssue.title}`, "success");
-        setPreviewImage(null);
-        setSelectedFile(null);
-        if (mapRef.current) {
-          mapRef.current.setView([newIssue.lat, newIssue.lng], 16);
-        }
-        return;
-      }
+      localStorage.setItem("urbanpulse_issues", JSON.stringify(nextIssues));
     } catch {
-      // Local AI heuristic simulation fallback
-      const isMuddy = previewImage && previewImage.length % 2 === 0;
-      const newIssue = {
-        id: `iss-tn-${Date.now().toString().slice(-4)}`,
-        title: isMuddy ? "Muddy Road Pothole Crater" : "Asphalt Cavity Defect",
-        category: "ROAD_TRANSIT",
-        department: "Highways & PWD",
-        severity: isMuddy ? 5 : 4,
-        lat: defectLat + (Math.random() - 0.5) * 0.003,
-        lng: defectLng + (Math.random() - 0.5) * 0.003,
-        device_lat: defectLat,
-        device_lng: defectLng,
-        is_on_site: isOnSiteVerified ? 1 : 0,
-        photo_url: previewImage || "https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80",
-        depth_cm: isMuddy ? ">10 cm (Severe Blind Hazard)" : "8 - 12 cm",
-        is_water_filled: isMuddy ? 1 : 0,
-        depth_advisory: isMuddy 
-          ? "Opaque turbid water concealing cavity floor. High risk of vehicle stalling, tire rupture, and two-wheeler overturning." 
-          : "Deep cavity with sharp asphalt edges. Axle shock hazard.",
-        impact_ambulance: "Priority Emergency Clearance Required",
-        impact_ev: isMuddy ? "High Battery Immersion Risk (>6 inches water)" : "Normal Safe Passability",
-        impact_two_wheeler: "CRITICAL: Severe Skidding and Overturn Hazard",
-        impact_four_wheeler: "Risk of Underbody Scraping and Rim Denting",
-        impact_pedestrian: "Unsafe for Walking / Slip Risk",
-        true_votes: 1,
-        false_votes: 0,
-        trust_score: 100,
-        status: "ACTIVE",
-        is_escalated: 0,
-        ticket_id: "",
-        ticket_receipt_json: "",
-        timestamp: new Date().toISOString()
-      };
-
-      setIssues(prev => [newIssue, ...prev]);
-      showToastMsg(`Defect classified by Local Vision Engine!`, "success");
-      setPreviewImage(null);
-      setSelectedFile(null);
-      if (mapRef.current) {
-        mapRef.current.setView([newIssue.lat, newIssue.lng], 16);
-      }
-    } finally {
-      setUploading(false);
+      // ignore
     }
+
+    if (mapRef.current) {
+      mapRef.current.flyTo([targetLat, targetLng], 17, { duration: 0.8 });
+      setTimeout(() => {
+        if (markersRef.current[newIssue.id]) {
+          markersRef.current[newIssue.id].openPopup();
+        }
+      }, 900);
+    }
+
+    setPreviewImage(null);
+    setSelectedFile(null);
+    setUploading(false);
+
+    showToastMsg("✅ Successfully published to live grid!", "success");
   };
 
-  // Find nearby unverified issue for the Proximity Alert Banner
-  const nearbyIssue = issues.find(i => {
-    if (i.is_escalated === 1) return false;
-    const dist = calculateDistance(currentGPS.lat, currentGPS.lng, i.lat, i.lng);
-    return dist <= 1000;
-  });
+  const activePreset = CATEGORY_PRESETS.find(p => p.id === selectedCategory) || CATEGORY_PRESETS[1];
 
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-cyan-500 selection:text-white">
-      {/* Toast Notification */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-2xl border text-sm font-semibold flex items-center gap-2 transition-all transform animate-bounce ${
-          toast.type === 'success' ? 'bg-emerald-900 border-emerald-500 text-emerald-200' :
-          toast.type === 'alert' ? 'bg-amber-900 border-amber-500 text-amber-100' :
-          toast.type === 'warning' ? 'bg-rose-900 border-rose-500 text-rose-200' :
-          'bg-cyan-900 border-cyan-500 text-cyan-200'
+          toast.type === 'alert' 
+            ? 'bg-rose-950/90 border-rose-600 text-rose-200' 
+            : toast.type === 'warning'
+            ? 'bg-amber-950/90 border-amber-600 text-amber-200'
+            : toast.type === 'success'
+            ? 'bg-emerald-950/90 border-emerald-600 text-emerald-200'
+            : 'bg-slate-900/90 border-cyan-500 text-cyan-200'
         }`}>
           <span>{toast.msg}</span>
         </div>
       )}
 
-      {/* Top Proximity Alert Banner (if within 1km of unverified defect) */}
-      {nearbyIssue && (
-        <div className="sticky top-0 z-40 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 text-white px-4 py-2.5 shadow-lg border-b border-amber-400/30 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="flex h-3 w-3 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-200 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-            </span>
-            <div className="text-xs sm:text-sm">
-              <span className="font-extrabold tracking-wide uppercase bg-black/30 px-2 py-0.5 rounded text-[10px] mr-2">
-                PROXIMITY RADAR ({Math.round(calculateDistance(currentGPS.lat, currentGPS.lng, nearbyIssue.lat, nearbyIssue.lng))}m away)
-              </span>
-              <strong className="underline underline-offset-2">{nearbyIssue.title}</strong> needs citizen verification to alert <span className="font-bold">{nearbyIssue.department}</span>.
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => handleVote(nearbyIssue.id, 'TRUE')}
-              className="bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-slate-950 font-bold px-3 py-1 rounded text-xs transition flex items-center gap-1 shadow"
-            >
-              👍 Confirm True ({nearbyIssue.true_votes})
-            </button>
-            <button
-              onClick={() => handleVote(nearbyIssue.id, 'FALSE')}
-              className="bg-slate-900 hover:bg-black active:scale-95 text-rose-300 font-bold px-3 py-1 rounded text-xs transition flex items-center gap-1 border border-rose-500/50"
-            >
-              👎 Flag Fake
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Main Header */}
-      <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur px-4 lg:px-8 py-3.5 flex flex-wrap items-center justify-between gap-4">
+      {/* Navigation Header */}
+      <header className="h-16 border-b border-slate-800 bg-slate-950/80 backdrop-blur sticky top-0 z-40 px-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-xl shadow-lg shadow-cyan-500/20 text-white">
-            <Radio className="w-6 h-6 animate-pulse" />
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+            <Radio className="w-6 h-6 text-white animate-pulse" />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-lg lg:text-xl font-black tracking-tight text-white flex items-center gap-2">
-                UrbanPulse
-                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
-                  Sentinel v2.4
-                </span>
+              <h1 className="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
+                UrbanPulse <span className="text-cyan-400">AI</span>
               </h1>
+              <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
+                Pagalahalli Sentinel
+              </span>
             </div>
             <p className="text-xs text-slate-400">
-              Local-AI Urban Infrastructure Sentinel & Automated Government Dispatch Engine • Dharmapuri Grid
+              Autonomous Municipal Dispatch & Real-Time Incident Grid
             </p>
           </div>
         </div>
 
-        {/* Status Indicators */}
         <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-lg text-xs">
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-            <span className="text-emerald-400 font-bold">Local Hugging Face Model (Active)</span>
-            <span className="text-slate-500 text-[10px]">openai/clip-vit-base-patch32</span>
+          <div className="hidden sm:flex items-center gap-2 text-xs bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-lg">
+            <MapPin className="w-4 h-4 text-emerald-400" />
+            <span>Grid Location: <strong className="text-white">Pagalahalli, Dharmapuri</strong></span>
           </div>
-
-          <div className="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-lg text-xs text-slate-300">
-            <Navigation className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Pagalahalli: 12.0932° N, 78.1841° E</span>
+          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-semibold bg-emerald-950/40 border border-emerald-800/60 px-3 py-1.5 rounded-lg">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            <span>Live Sync</span>
           </div>
         </div>
       </header>
 
-      {/* Main Grid Content */}
-      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-0 overflow-hidden">
+      {/* Main Content Layout */}
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
         
-        {/* Left Side: Map View (8 cols on lg) */}
-        <div className="lg:col-span-8 flex flex-col relative h-[500px] lg:h-auto border-b lg:border-b-0 lg:border-r border-slate-800">
-          {/* Map Top Bar: Filter stats on left */}
+        {/* Left Side: Map View (8 cols) */}
+        <div className="lg:col-span-8 relative h-[52vh] lg:h-[calc(100vh-65px)] border-b lg:border-b-0 lg:border-r border-slate-800">
+          
           <div className="absolute top-3 left-3 z-[400] flex flex-wrap gap-2 pointer-events-auto">
             <div className="bg-slate-900/90 backdrop-blur border border-slate-700 text-xs px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
@@ -828,20 +911,21 @@ export default function App() {
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ml-1"></span>
               <span className="text-slate-300">Sanitation ({issues.filter(i => i.department === 'Municipal Sanitation').length})</span>
             </div>
+
             <button
               onClick={() => {
                 if (mapRef.current) {
-                  mapRef.current.setView([12.0932, 78.1841], 16);
+                  mapRef.current.setView([PAGALAHALLI_COORDS.lat, PAGALAHALLI_COORDS.lng], 16);
+                  setPinLocation(PAGALAHALLI_COORDS);
                 }
               }}
               className="bg-slate-900/90 hover:bg-slate-800 text-cyan-400 border border-slate-700 text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-lg flex items-center gap-1 transition"
             >
               <RefreshCw className="w-3.5 h-3.5" />
-              Recenter
+              Recenter Pagalahalli
             </button>
           </div>
 
-          {/* Multi-Layer Map View Switcher Button Bar (Top-Right) */}
           <div className="absolute top-3 right-3 z-[400] bg-slate-900/90 backdrop-blur border border-slate-700/90 p-1 rounded-xl shadow-2xl flex items-center gap-1 pointer-events-auto">
             {Object.keys(MAP_LAYERS).map((key) => {
               const layer = MAP_LAYERS[key];
@@ -863,48 +947,43 @@ export default function App() {
             })}
           </div>
 
-          {/* Leaflet Map DOM Element */}
           <div id="map" ref={mapContainerRef} className="w-full h-full bg-slate-950 z-10" />
 
-          {/* Legend Banner on Map Footer */}
-          <div className="absolute bottom-3 left-3 right-3 z-[400] bg-slate-900/85 backdrop-blur border border-slate-800 rounded-lg p-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xl pointer-events-auto">
+          <div className="absolute bottom-3 left-3 right-3 z-[400] bg-slate-900/90 backdrop-blur border border-slate-800 rounded-lg p-2.5 text-xs flex flex-wrap items-center justify-between gap-2 shadow-2xl pointer-events-auto">
             <div className="flex items-center gap-2 text-slate-300">
-              <MapPin className="w-4 h-4 text-cyan-400" />
-              <span>Active Layer: <strong className="text-cyan-400">{MAP_LAYERS[activeLayer]?.name}</strong></span>
+              <span className="text-amber-400 font-bold">📍 Defect Pin:</span>
+              <span className="font-mono text-cyan-400 font-bold">{pinLocation.lat.toFixed(5)}°N, {pinLocation.lng.toFixed(5)}°E</span>
+              <span className="hidden sm:inline text-[11px] text-amber-300 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800/60">
+                👆 Tap anywhere on satellite map to move pin
+              </span>
             </div>
             <div className="flex items-center gap-3 text-[11px]">
               <span className="flex items-center gap-1 text-amber-400 font-semibold">
                 <span className="w-2 h-2 rounded-full bg-amber-400"></span>
-                Gold Ring: Official Escalated Ticket
+                Gold Ring: Official Work Order
               </span>
-              <span className="text-slate-400">|</span>
+              <span className="text-slate-500">|</span>
               <span className="text-slate-300">
-                Auto-Dispatch Threshold: <strong>5 True Citizen Votes</strong>
+                Threshold: <strong>5 Citizen Votes</strong>
               </span>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Camera Capture, Defect Dispatch & Issues Feed (4 cols on lg) */}
+        {/* Right Side: Camera Capture & Feed (4 cols) */}
         <div className="lg:col-span-4 flex flex-col h-auto lg:h-[calc(100vh-65px)] bg-slate-900 overflow-y-auto">
           
-          {/* SECTION 1: Camera Capture & Local AI Engine Upload */}
-          <div className="p-4 border-b border-slate-800 bg-slate-900/60">
-            <div className="flex items-center justify-between mb-3">
+          <div className="p-4 border-b border-slate-800 bg-slate-900/60 space-y-3">
+            <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 <Camera className="w-4 h-4 text-cyan-400" />
                 Sentinel Defect Sensor
               </h2>
-              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${
-                isOnSiteVerified 
-                  ? 'bg-emerald-950 text-emerald-300 border-emerald-800' 
-                  : 'bg-amber-950 text-amber-300 border-amber-800'
-              }`}>
-                {isOnSiteVerified ? '🟢 On-Site Verified (<=150m)' : '⚠️ Remote Upload'}
+              <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border bg-emerald-950 text-emerald-300 border-emerald-800">
+                🟢 Pagalahalli Grid
               </span>
             </div>
 
-            {/* Hidden Input for Real Camera Capture */}
             <input
               type="file"
               accept="image/*"
@@ -914,18 +993,39 @@ export default function App() {
               className="hidden"
             />
 
-            {/* Capture Triggers */}
             {!previewImage ? (
               <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => fileInputRef.current && fileInputRef.current.click()}
-                  className="w-full py-3.5 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold rounded-xl shadow-lg shadow-cyan-600/20 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-3 px-4 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-extrabold rounded-xl shadow-lg shadow-cyan-600/20 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm"
                 >
                   <Camera className="w-5 h-5" />
                   📷 Capture Defect with Camera
                 </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setPreviewImage("https://images.unsplash.com/photo-1515162816999-a0c47dc192f7?auto=format&fit=crop&w=600&q=80");
+                      showToastMsg("Sample road photo loaded! Tap category below to customize.", "info");
+                    }}
+                    className="flex-1 py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition text-center"
+                  >
+                    Load Sample Road Photo
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPreviewImage("https://images.unsplash.com/photo-1530587191325-3db32d826c18?auto=format&fit=crop&w=600&q=80");
+                      setSelectedCategory("dustbin");
+                      showToastMsg("Sample garbage photo loaded! 🚯 Dustbin category selected.", "info");
+                    }}
+                    className="flex-1 py-1.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg text-xs font-semibold border border-slate-700 transition text-center"
+                  >
+                    Load Sample Dustbin Photo
+                  </button>
+                </div>
                 <p className="text-[11px] text-center text-slate-400">
-                  Takes live road defect snapshot with hardware GPS stamping
+                  Resizes to &lt;100 KB client-side for zero-freeze instant performance.
                 </p>
               </div>
             ) : (
@@ -934,57 +1034,95 @@ export default function App() {
                   <img
                     src={previewImage}
                     alt="Defect preview"
-                    className="w-full h-44 object-cover"
+                    className="w-full h-40 object-cover"
                   />
                   <div className="absolute top-2 right-2 flex gap-1">
                     <button
                       onClick={() => { setPreviewImage(null); setSelectedFile(null); }}
-                      className="p-1.5 bg-black/70 hover:bg-black text-rose-400 rounded-lg text-xs"
+                      className="p-1.5 bg-black/75 hover:bg-black text-rose-400 rounded-lg text-xs transition"
                       title="Discard photo"
                     >
                       <XCircle className="w-4 h-4" />
                     </button>
                   </div>
-                  <div className="absolute bottom-2 left-2 bg-black/70 backdrop-blur px-2 py-1 rounded text-[10px] text-slate-300 flex items-center gap-1">
+                  <div className="absolute bottom-2 left-2 bg-black/75 backdrop-blur px-2 py-1 rounded text-[10px] text-slate-200 flex items-center gap-1">
                     <MapPin className="w-3 h-3 text-cyan-400" />
-                    GPS: {currentGPS.lat.toFixed(4)}, {currentGPS.lng.toFixed(4)}
+                    Target: {pinLocation.lat.toFixed(4)}, {pinLocation.lng.toFixed(4)} (Tap map to move)
+                  </div>
+                </div>
+
+                {/* 1-TAP CATEGORY SELECTOR */}
+                <div className="space-y-2 pt-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                      <span>🏷️</span> 1-Tap Category Selector:
+                    </span>
+                    <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-wider">
+                      {activePreset.label}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                    {CATEGORY_PRESETS.map((preset) => {
+                      const isSelected = selectedCategory === preset.id;
+                      return (
+                        <button
+                          key={preset.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCategory(preset.id);
+                            showToastMsg(`Selected ${preset.label}`, "info");
+                          }}
+                          className={`py-2 px-2.5 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 justify-center ${
+                            isSelected
+                              ? 'bg-gradient-to-r ' + preset.color + ' text-white border-white/60 shadow-lg scale-[1.02] ring-2 ring-cyan-400/40'
+                              : 'bg-slate-950/80 hover:bg-slate-800 text-slate-300 border-slate-700/80'
+                          }`}
+                        >
+                          <span className="text-base">{preset.emoji}</span>
+                          <span className="truncate">{preset.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-slate-950/90 border border-slate-800 text-[11px] space-y-1">
+                    <div className="flex items-center justify-between text-slate-200">
+                      <span className="truncate font-semibold">{activePreset.title}</span>
+                      <span className="text-rose-400 font-bold shrink-0 ml-1">Grade {activePreset.severity}/5</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400 text-[10px]">
+                      <span>Dept: <strong className="text-cyan-400">{activePreset.department}</strong></span>
+                      <span>Depth: <strong className="text-amber-400">{activePreset.depth}</strong></span>
+                    </div>
                   </div>
                 </div>
 
                 <button
-                  onClick={handleSubmitDefect}
+                  onClick={handleBroadcastDefect}
                   disabled={uploading}
-                  className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold rounded-xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition flex items-center justify-center gap-2 text-sm disabled:opacity-50"
                 >
-                  {uploading ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      Analyzing with Local CLIP & Dispatching...
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="w-5 h-5" />
-                      Analyze & Dispatch to Grid
-                    </>
-                  )}
+                  <ShieldCheck className="w-5 h-5" />
+                  📡 Broadcast Defect to Live Grid
                 </button>
               </div>
             )}
           </div>
 
-          {/* SECTION 2: Live Feed & Multi-Vehicle Passability Matrix */}
           <div className="flex-1 p-4 space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-bold text-white flex items-center gap-2">
                 <FileText className="w-4 h-4 text-cyan-400" />
                 Active Grid Incidents ({issues.length})
               </h2>
-              <span className="text-xs text-slate-400">Synced Real-Time</span>
+              <span className="text-xs text-slate-400">Zero-Network Real-Time</span>
             </div>
 
             {issues.map(issue => {
               const deptColor = getDeptColor(issue.department);
               const isEscalated = issue.is_escalated === 1;
+              const passabilityRows = getPassabilityMatrix(issue);
 
               return (
                 <div
@@ -1027,69 +1165,41 @@ export default function App() {
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-800">
                           Grade {issue.severity}/5
                         </span>
-
-                        {issue.is_water_filled === 1 && (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800 flex items-center gap-1">
-                            <Droplets className="w-2.5 h-2.5" /> Muddy Hazard
-                          </span>
-                        )}
                       </div>
 
-                      {/* Depth info */}
                       {issue.depth_cm !== 'N/A' && (
-                        <p className="text-[11px] text-slate-300 leading-snug line-clamp-2">
+                        <p className="text-[11px] text-slate-300 leading-snug">
                           <strong>Depth:</strong> {issue.depth_cm}
                         </p>
                       )}
                     </div>
                   </div>
 
-                  {/* Multi-Vehicle Passability Impact Grid */}
-                  <div className="mt-3 pt-3 border-t border-slate-800/80">
-                    <div className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 mb-1.5 flex items-center gap-1">
-                      <Truck className="w-3 h-3 text-cyan-400" />
-                      Multi-Vehicle Passability Impact
+                  {/* Multi-Vehicle Passability Impact */}
+                  <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-1.5">
+                    <div className="text-[10px] uppercase tracking-wider font-extrabold text-slate-400 flex items-center justify-between">
+                      <span className="flex items-center gap-1">
+                        <Truck className="w-3 h-3 text-cyan-400" />
+                        Multi-Vehicle Passability Impact
+                      </span>
+                      <span className="text-[9px] text-cyan-400 font-mono">LIVE SAFETY MATRIX</span>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5 text-[10px]">
-                      <div className="p-1.5 rounded bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1">
-                          <Truck className="w-3 h-3 text-red-400" /> Ambulance
-                        </span>
-                        <span className={`font-semibold ${issue.severity >= 4 ? 'text-red-400' : 'text-emerald-400'}`}>
-                          {issue.severity >= 4 ? 'EMERGENCY' : 'PASSABLE'}
-                        </span>
-                      </div>
 
-                      <div className="p-1.5 rounded bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1">
-                          <Zap className="w-3 h-3 text-yellow-400" /> EV Battery
-                        </span>
-                        <span className={`font-semibold ${issue.is_water_filled ? 'text-amber-400' : 'text-emerald-400'}`}>
-                          {issue.is_water_filled ? 'SUBMERGED' : 'SAFE'}
-                        </span>
-                      </div>
-
-                      <div className="p-1.5 rounded bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1">
-                          <Bike className="w-3 h-3 text-orange-400" /> 2-Wheeler
-                        </span>
-                        <span className="font-semibold text-rose-400">
-                          {issue.severity >= 3 ? 'SKID RISK' : 'PASSABLE'}
-                        </span>
-                      </div>
-
-                      <div className="p-1.5 rounded bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                        <span className="text-slate-400 flex items-center gap-1">
-                          <Car className="w-3 h-3 text-blue-400" /> 4-Wheeler
-                        </span>
-                        <span className="font-semibold text-slate-300">
-                          {issue.severity >= 3 ? 'SCRAPE' : 'PASSABLE'}
-                        </span>
-                      </div>
+                    <div className="space-y-1">
+                      {passabilityRows.map((r, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] ${r.style}`}
+                        >
+                          <span className="font-semibold flex items-center gap-1.5 text-slate-200">
+                            <span>{r.icon}</span> {r.label}
+                          </span>
+                          <span className="font-bold tracking-tight">{r.status}</span>
+                        </div>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Verification & Actions */}
                   <div className="mt-3 pt-2.5 border-t border-slate-800 flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
                       <button
@@ -1105,7 +1215,7 @@ export default function App() {
                         👎 Fake ({issue.false_votes})
                       </button>
                       <button
-                        onClick={() => speakAloud(`Attention Dharmapuri commuters. Incident at ${issue.department}. ${issue.title}. Depth: ${issue.depth_cm}. Passability status: ${issue.impact_two_wheeler}.`)}
+                        onClick={() => speakAloud(`Attention Dharmapuri commuters. Department: ${issue.department}. Incident: ${issue.title}. Depth: ${issue.depth_cm}. Passability status: ${issue.impact_two_wheeler}.`)}
                         className="p-1.5 bg-slate-800 hover:bg-slate-700 text-cyan-400 rounded text-xs transition"
                         title="Read aloud"
                       >
@@ -1131,12 +1241,12 @@ export default function App() {
                     )}
                   </div>
 
-                  {/* 360° Street View Action Button on Card */}
                   <div className="mt-2">
                     <button
                       onClick={() => setStreetViewIssue(issue)}
                       className="w-full py-1.5 px-3 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-500 hover:to-blue-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-md shadow-sky-600/20 active:scale-[0.98]"
                     >
+                      <Eye className="w-3.5 h-3.5" />
                       <span>👁️ 360° Street View</span>
                     </button>
                   </div>
@@ -1144,76 +1254,68 @@ export default function App() {
               );
             })}
           </div>
-
         </div>
-      </main>
+      </div>
 
       {/* Official Government Work Order Modal */}
       {showModal && selectedIssue && (
         <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
-            {/* Requisition Header */}
-            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 p-6 border-b border-slate-800 flex items-start justify-between">
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-6 py-4 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-serif font-black text-xl">
-                  TN
+                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                  <FileText className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="text-[11px] font-extrabold uppercase tracking-widest text-amber-400">
-                    Government of Tamil Nadu • Municipal Infrastructure Administration
-                  </div>
-                  <h2 className="text-lg font-black text-white">
-                    Official Emergency Work Order Requisition
-                  </h2>
-                  <div className="text-xs text-slate-400 flex items-center gap-2 mt-0.5">
-                    <span>Ticket ID: <strong>{selectedIssue.ticket_id || activeReceipt?.ticket_id || 'TN-DISPATCH-PENDING'}</strong></span>
-                    <span>•</span>
-                    <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                      <CheckCircle2 className="w-3 h-3" /> CPGRAMS / TN e-Gov Acknowledged
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-white">
+                      Official Tamil Nadu Municipal Work Order
+                    </h2>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                      CPGRAMS #201
                     </span>
                   </div>
+                  <p className="text-xs text-slate-400">
+                    Auto-Routed via UrbanPulse Citizen Verification Grid
+                  </p>
                 </div>
               </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
               >
-                <XCircle className="w-6 h-6" />
+                <XCircle className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              
-              {/* SLA & Department Details Banner */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-slate-400 text-[10px] uppercase font-bold">Assigned Department</div>
-                  <div className="text-sm font-bold text-white mt-0.5">{selectedIssue.department}</div>
-                  <div className="text-[10px] text-cyan-400 mt-1">Dharmapuri Ward 4 Division</div>
-                </div>
-
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-slate-400 text-[10px] uppercase font-bold">Response SLA Target</div>
-                  <div className="text-sm font-bold text-amber-400 mt-0.5">
-                    {activeReceipt?.sla_deadline || "24 Hours (Emergency Response)"}
-                  </div>
-                  <div className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
-                    <Clock className="w-3 h-3 text-amber-400" /> Statutory Mandate
+            <div className="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+                <div>
+                  <div className="text-slate-400 text-[10px] uppercase font-bold">Ticket ID</div>
+                  <div className="text-xs font-mono font-bold text-cyan-400 mt-0.5">
+                    {selectedIssue.ticket_id || "TN-PWD-2026-9104"}
                   </div>
                 </div>
-
-                <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-slate-400 text-[10px] uppercase font-bold">Assigned Ward Officer</div>
-                  <div className="text-sm font-bold text-white mt-0.5">
-                    {activeReceipt?.assigned_ward_officer || "Assistant Executive Engineer - Zone 4"}
+                <div>
+                  <div className="text-slate-400 text-[10px] uppercase font-bold">Jurisdiction</div>
+                  <div className="text-xs font-bold text-slate-200 mt-0.5">
+                    Dharmapuri Region
                   </div>
-                  <div className="text-[10px] text-emerald-400 mt-1">Status: DISPATCHED</div>
+                </div>
+                <div>
+                  <div className="text-slate-400 text-[10px] uppercase font-bold">Priority SLA</div>
+                  <div className="text-xs font-bold text-rose-400 mt-0.5">
+                    {selectedIssue.severity >= 4 ? "24h Emergency" : "48h Standard"}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-400 text-[10px] uppercase font-bold">Target Ward Officer</div>
+                  <div className="text-xs font-bold text-emerald-400 mt-0.5">
+                    Zone 4 Assistant Exec.
+                  </div>
                 </div>
               </div>
 
-              {/* Photo & Technical Estimation */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-950/70 p-4 rounded-xl border border-slate-800">
                 <div>
                   <div className="text-slate-400 text-[10px] uppercase font-bold mb-2">Photographic Evidence Attachment</div>
@@ -1240,6 +1342,8 @@ export default function App() {
                     <div className="text-xs font-semibold text-cyan-300 mt-0.5">
                       {selectedIssue.category === 'ROAD_TRANSIT'
                         ? '2.0 Tons Premix Cold Asphalt + Vibratory Compactor Roller'
+                        : selectedIssue.category === 'SANITATION_WASTE'
+                        ? 'Compactor Truck + 4 Sanitary Workers + Disinfection Spray'
                         : 'Standard Municipal Hardware Replacement Kit'}
                     </div>
                   </div>
@@ -1253,7 +1357,6 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Expandable Raw JSON Transmission Payload View */}
               <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-950">
                 <button
                   onClick={() => setShowPayloadDetails(!showPayloadDetails)}
@@ -1278,10 +1381,8 @@ export default function App() {
                   </pre>
                 )}
               </div>
-
             </div>
 
-            {/* Modal Footer */}
             <div className="bg-slate-950 px-6 py-3 border-t border-slate-800 flex items-center justify-between">
               <span className="text-[11px] text-slate-500">
                 Authorized under Section 142 of TN District Municipalities Act
@@ -1293,7 +1394,6 @@ export default function App() {
                 Close Requisition
               </button>
             </div>
-
           </div>
         </div>
       )}
@@ -1303,7 +1403,6 @@ export default function App() {
         <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-5">
           <div className="bg-slate-900 border border-slate-700 w-full max-w-4xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
             
-            {/* Modal Header */}
             <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 px-5 py-3.5 border-b border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-sky-500/10 border border-sky-500/30 flex items-center justify-center text-sky-400 text-lg">
@@ -1343,7 +1442,6 @@ export default function App() {
               </div>
             </div>
 
-            {/* Panorama Iframe */}
             <div className="relative w-full h-[450px] sm:h-[500px] bg-black">
               <iframe
                 title={`360 Street View - ${streetViewIssue.title}`}
@@ -1354,7 +1452,6 @@ export default function App() {
               />
             </div>
 
-            {/* Modal Footer */}
             <div className="bg-slate-950 px-5 py-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs">
               <div className="flex items-center gap-3 text-slate-400 text-[11px]">
                 <span>📍 Lat: <strong className="text-slate-200">{streetViewIssue.lat.toFixed(5)}</strong>, Lng: <strong className="text-slate-200">{streetViewIssue.lng.toFixed(5)}</strong></span>
