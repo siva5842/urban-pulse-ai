@@ -49,3 +49,68 @@ Categorizes defects and routes work orders directly to the responsible division:
 ---
 
 ## 🏗️ System Architecture
+
+[Mobile Camera + GPS] ──> [Haversine Anti-Spoofing Check]
+│
+▼
+[Local Hugging Face CLIP Engine]
+(Multi-Category Triage + Depth Estimation)
+│
+▼
+[Interactive Map (Satellite)]
+(Pins with 360° Street View & Voice Alert)
+│
+▼
+[Proximity Citizen Consensus Voting]
+(👍 True  /  👎 Fake Alert)
+│
+▼ (Threshold: 5 Votes)
+[Autonomous Government Ticket Dispatcher]
+(Ticket ID #TN-PWD-8921 + 24-Hour SLA Timer)
+
+
+---
+
+## 🚀 Quick Start (Run Locally)
+
+### 1. Clone the Repository
+```bash
+git clone [https://github.com/siva5842/urban-pulse-ai.git](https://github.com/siva5842/urban-pulse-ai.git)
+cd urban-pulse-ai
+2. Start the Backend Service
+Bash
+# Navigate to backend directory
+cd backend
+
+# Create and activate a virtual environment (optional but recommended)
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start FastAPI server (Runs on port 8000)
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
+On first startup, the Hugging Face model (openai/clip-vit-base-patch32, ~300MB) will automatically download and cache locally.
+
+3. Start the Frontend Application
+Open a new terminal tab:
+
+Bash
+# Navigate to frontend directory
+cd frontend
+
+# Install node dependencies
+npm install
+
+# Start Vite development server
+npm run dev -- --host
+Open http://localhost:5173 (or your local IP http://192.168.x.x:5173 on your smartphone) in your browser.
+
+👥 Contributors & Credits
+Sivaprakasham Palanisamy (@siva5842) — Full-Stack Architecture, AI Engine & System Integration
+
+Yokesh E (@Yokesh-12) — Co-Author, Mapping & Community Validation Pipelines
+
+📜 License
+This project is open-source under the MIT License.
